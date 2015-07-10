@@ -16,6 +16,7 @@ import (
 	"golang.org/x/mobile/exp/sprite"
 	"golang.org/x/mobile/exp/sprite/clock"
 	"golang.org/x/mobile/exp/sprite/glsprite"
+	"golang.org/x/mobile/geom"
 	"golang.org/x/mobile/gl"
 )
 
@@ -29,6 +30,8 @@ var (
 
 	scene *sprite.Node
 	eng   = glsprite.Engine()
+
+	shipPos = geom.Point{100, 100}
 )
 
 func main() {
@@ -36,6 +39,7 @@ func main() {
 		Start: start,
 		Draw:  draw,
 		Stop:  stop,
+		Touch: touch,
 	})
 }
 
@@ -50,15 +54,26 @@ func stop() {
 func draw(c event.Config) {
 	if scene == nil {
 		scene = setupScene()
+
+		fmt.Printf("Device Stats:\nsize:%vx%v\nPixelsPerPt:%v",
+			c.Width,
+			c.Height,
+			c.PixelsPerPt,
+		)
 	}
 
-	gl.ClearColor(0, 0, 1, 1)
+	gl.ClearColor(0, 0, 0, 0)
 	gl.Clear(gl.COLOR_BUFFER_BIT)
 
 	now := clock.Time(time.Since(startTime) * 60 / time.Second)
 
 	eng.Render(scene, now, c)
 	debug.DrawFPS(c)
+}
+
+func touch(t event.Touch, c event.Config) {
+	shipPos = t.Loc
+	fmt.Printf("touch at %v:%v\n", t.Loc.X, t.Loc.Y)
 }
 
 func setupScene() *sprite.Node {
@@ -69,24 +84,35 @@ func setupScene() *sprite.Node {
 		{0, 1, 0},
 	})
 
-	playerShip := loadPlayerShip()
+	playerShip := loadSprite("player_ship.png")
 
 	shipNode := &sprite.Node{}
 	eng.Register(shipNode)
 	scene.AppendChild(shipNode)
 	shipNode.Arranger = arrangerFunc(func(eng sprite.Engine, n *sprite.Node, t clock.Time) {
-		eng.SetSubTex(n, playerShip)
+		eng.SetSubTex(n, playerShip.SubTex)
+
+		width := float32(playerShip.Width)
+		height := float32(playerShip.Height)
+
+		x := float32(shipPos.X) - width/2
+		y := float32(shipPos.Y) - height/2
 
 		eng.SetTransform(n, f32.Affine{
-			{width, 0, 100},
-			{0, height, 100},
+			{width, 0, x},
+			{0, height, y},
 		})
 	})
 
 	return scene
 }
 
-func loadPlayerShip() sprite.SubTex {
+type Sprite struct {
+	sprite.SubTex
+	Width, Height int
+}
+
+func loadSprite(fileName string) Sprite {
 	a, err := asset.Open("player_ship.png")
 	if err != nil {
 		log.Fatal(err)
@@ -104,10 +130,18 @@ func loadPlayerShip() sprite.SubTex {
 
 	bounds := img.Bounds()
 
-	shipWidth := bounds.Max.X - bounds.Min.X
-	shipHeight := bounds.Max.Y - bounds.Min.Y
+	imgWidth := bounds.Max.X - bounds.Min.X
+	fmt.Printf("sprite width: %v\n", imgWidth)
+	imgHeight := bounds.Max.Y - bounds.Min.Y
+	fmt.Printf("sprite height: %v\n", imgHeight)
 
-	return sprite.SubTex{t, image.Rect(0, 0, shipWidth, shipHeight)}
+	subTex := sprite.SubTex{t, image.Rect(0, 0, imgWidth, imgHeight)}
+
+	return Sprite{
+		SubTex: subTex,
+		Width:  imgWidth,
+		Height: imgHeight,
+	}
 }
 
 type arrangerFunc func(e sprite.Engine, n *sprite.Node, t clock.Time)
