@@ -25,7 +25,8 @@ var (
 	scene *sprite.Node
 	eng   = glsprite.Engine()
 
-	deltaV float32 = 1.2
+	shipDeltaV   float32 = 1.2
+	bulletDeltaV geom.Pt = 3
 
 	shipPos = geom.Point{100, 100}
 
@@ -82,16 +83,27 @@ func touch(t event.Touch, c event.Config) {
 	bottomTenthY := c.Height - c.Height/8
 	if t.Loc.Y > bottomTenthY {
 		log.Println("FIRE ZE MISSLES")
+
+		firingPoint := shipPos
+
 		bullet := loadSprite("bullet.png")
 		bulletNode := newNode()
-		firingPoint := shipPos
 		bulletNode.Arranger = arrangerFunc(func(eng sprite.Engine, n *sprite.Node, t clock.Time) {
 			eng.SetSubTex(n, bullet.SubTex)
 
+			bulletScalingFactor := 4
+			width := float32(bullet.Width / bulletScalingFactor)
+			height := float32(bullet.Height / bulletScalingFactor)
+
+			x := float32(firingPoint.X) - float32(bullet.Width/(2*bulletScalingFactor))
+			y := float32(firingPoint.Y) - 20 // magic number for tip of ship
+
 			eng.SetTransform(n, f32.Affine{
-				{float32(bullet.Width), 0, float32(firingPoint.X)},
-				{0, float32(bullet.Height), float32(firingPoint.Y)},
+				{width, 0, x},
+				{0, height, y},
 			})
+
+			firingPoint.Y = firingPoint.Y - bulletDeltaV
 		})
 
 	} else {
@@ -121,16 +133,16 @@ func setupScene() *sprite.Node {
 				nextShipPos = nil
 			} else {
 				if nextShipPos.X > shipPos.X {
-					shipPos.X = geom.Pt(float32(shipPos.X) + deltaV)
+					shipPos.X = geom.Pt(float32(shipPos.X) + shipDeltaV)
 				}
 				if nextShipPos.X < shipPos.X {
-					shipPos.X = geom.Pt(float32(shipPos.X) - deltaV)
+					shipPos.X = geom.Pt(float32(shipPos.X) - shipDeltaV)
 				}
 				if nextShipPos.Y > shipPos.Y {
-					shipPos.Y = geom.Pt(float32(shipPos.Y) + deltaV)
+					shipPos.Y = geom.Pt(float32(shipPos.Y) + shipDeltaV)
 				}
 				if nextShipPos.Y < shipPos.Y {
-					shipPos.Y = geom.Pt(float32(shipPos.Y) - deltaV)
+					shipPos.Y = geom.Pt(float32(shipPos.Y) - shipDeltaV)
 				}
 			}
 		}
