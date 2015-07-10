@@ -22,8 +22,10 @@ import (
 var (
 	startTime = time.Now()
 
-	scene *sprite.Node
-	eng   = glsprite.Engine()
+	fullScene  *sprite.Node
+	background *sprite.Node
+	foreground *sprite.Node
+	eng        = glsprite.Engine()
 
 	shipDeltaV   float32 = 1.2
 	bulletDeltaV geom.Pt = 3
@@ -64,8 +66,8 @@ func draw(c event.Config) {
 		)
 	}
 
-	if scene == nil {
-		scene = setupScene()
+	if fullScene == nil {
+		fullScene = setupScene()
 	}
 
 	gl.ClearColor(0, 0, 0, 0)
@@ -73,7 +75,7 @@ func draw(c event.Config) {
 
 	now := clock.Time(time.Since(startTime) * 60 / time.Second)
 
-	eng.Render(scene, now, c)
+	eng.Render(fullScene, now, c)
 	debug.DrawFPS(c)
 }
 
@@ -87,7 +89,7 @@ func touch(t event.Touch, c event.Config) {
 		firingPoint := shipPos
 
 		bullet := loadSprite("bullet.png")
-		bulletNode := newNode()
+		bulletNode := newNode(background)
 		bulletNode.Arranger = arrangerFunc(func(eng sprite.Engine, n *sprite.Node, t clock.Time) {
 			eng.SetSubTex(n, bullet.SubTex)
 
@@ -112,15 +114,18 @@ func touch(t event.Touch, c event.Config) {
 }
 
 func setupScene() *sprite.Node {
-	scene = &sprite.Node{}
-	eng.Register(scene)
-	eng.SetTransform(scene, f32.Affine{
+	fullScene = &sprite.Node{}
+	eng.Register(fullScene)
+	eng.SetTransform(fullScene, f32.Affine{
 		{1, 0, 0},
 		{0, 1, 0},
 	})
 
+	background = newNode(fullScene)
+	foreground = newNode(fullScene)
+
 	playerShip := loadSprite("player_ship.png")
-	shipNode := newNode()
+	shipNode := newNode(foreground)
 
 	shipNode.Arranger = arrangerFunc(func(eng sprite.Engine, n *sprite.Node, t clock.Time) {
 		eng.SetSubTex(n, playerShip.SubTex)
@@ -156,10 +161,10 @@ func setupScene() *sprite.Node {
 		})
 	})
 
-	return scene
+	return fullScene
 }
 
-func newNode() *sprite.Node {
+func newNode(scene *sprite.Node) *sprite.Node {
 	node := &sprite.Node{}
 	eng.Register(node)
 	scene.AppendChild(node)
