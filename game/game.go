@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"image"
 	"log"
 	"time"
@@ -20,18 +19,17 @@ import (
 	"golang.org/x/mobile/gl"
 )
 
-const (
-	width  = 640
-	height = 480
-)
-
 var (
 	startTime = time.Now()
 
 	scene *sprite.Node
 	eng   = glsprite.Engine()
 
+	deltaV float32 = 1.2
+
 	shipPos = geom.Point{100, 100}
+
+	nextShipPos *geom.Point
 )
 
 func main() {
@@ -44,18 +42,18 @@ func main() {
 }
 
 func start() {
-	fmt.Println("starting app")
+	log.Println("starting app")
 }
 
 func stop() {
-	fmt.Println("stopping app")
+	log.Println("stopping app")
 }
 
 func draw(c event.Config) {
 	if scene == nil {
 		scene = setupScene()
 
-		fmt.Printf("Device Stats:\nsize:%vx%v\nPixelsPerPt:%v",
+		log.Printf("Device Stats: Size:%vx%v PixelsPerPt:%v",
 			c.Width,
 			c.Height,
 			c.PixelsPerPt,
@@ -72,8 +70,8 @@ func draw(c event.Config) {
 }
 
 func touch(t event.Touch, c event.Config) {
-	shipPos = t.Loc
-	fmt.Printf("touch at %v:%v\n", t.Loc.X, t.Loc.Y)
+	nextShipPos = &t.Loc
+	log.Printf("touch at %v:%v\n", t.Loc.X, t.Loc.Y)
 }
 
 func setupScene() *sprite.Node {
@@ -94,6 +92,25 @@ func setupScene() *sprite.Node {
 
 		width := float32(playerShip.Width)
 		height := float32(playerShip.Height)
+
+		if nextShipPos != nil {
+			if *nextShipPos == shipPos {
+				nextShipPos = nil
+			} else {
+				if nextShipPos.X > shipPos.X {
+					shipPos.X = geom.Pt(float32(shipPos.X) + deltaV)
+				}
+				if nextShipPos.X < shipPos.X {
+					shipPos.X = geom.Pt(float32(shipPos.X) - deltaV)
+				}
+				if nextShipPos.Y > shipPos.Y {
+					shipPos.Y = geom.Pt(float32(shipPos.Y) + deltaV)
+				}
+				if nextShipPos.Y < shipPos.Y {
+					shipPos.Y = geom.Pt(float32(shipPos.Y) - deltaV)
+				}
+			}
+		}
 
 		x := float32(shipPos.X) - width/2
 		y := float32(shipPos.Y) - height/2
@@ -131,9 +148,8 @@ func loadSprite(fileName string) Sprite {
 	bounds := img.Bounds()
 
 	imgWidth := bounds.Max.X - bounds.Min.X
-	fmt.Printf("sprite width: %v\n", imgWidth)
 	imgHeight := bounds.Max.Y - bounds.Min.Y
-	fmt.Printf("sprite height: %v\n", imgHeight)
+	log.Printf("sprite %v size: %vx%v\n", fileName, imgWidth, imgHeight)
 
 	subTex := sprite.SubTex{t, image.Rect(0, 0, imgWidth, imgHeight)}
 
