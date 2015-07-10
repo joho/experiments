@@ -30,6 +30,8 @@ var (
 	shipPos = geom.Point{100, 100}
 
 	nextShipPos *geom.Point
+
+	bottomRight *geom.Point
 )
 
 func main() {
@@ -50,14 +52,19 @@ func stop() {
 }
 
 func draw(c event.Config) {
-	if scene == nil {
-		scene = setupScene()
+	currentBottomRight := geom.Point{c.Width, c.Height}
+	if bottomRight == nil || currentBottomRight != *bottomRight {
+		bottomRight = &currentBottomRight
 
-		log.Printf("Device Stats: Size:%vx%v PixelsPerPt:%v",
+		log.Printf("Device Sizing: %vx%v PixelsPerPt:%v",
 			c.Width,
 			c.Height,
 			c.PixelsPerPt,
 		)
+	}
+
+	if scene == nil {
+		scene = setupScene()
 	}
 
 	gl.ClearColor(0, 0, 0, 0)
@@ -70,12 +77,30 @@ func draw(c event.Config) {
 }
 
 func touch(t event.Touch, c event.Config) {
-	nextShipPos = &t.Loc
 	log.Printf("touch at %v:%v\n", t.Loc.X, t.Loc.Y)
+
+	bottomTenthY := c.Height - c.Height/8
+	if t.Loc.Y > bottomTenthY {
+		log.Println("FIRE ZE MISSLES")
+		bullet := loadSprite("bullet.png")
+		bulletNode := newNode()
+		firingPoint := shipPos
+		bulletNode.Arranger = arrangerFunc(func(eng sprite.Engine, n *sprite.Node, t clock.Time) {
+			eng.SetSubTex(n, bullet.SubTex)
+
+			eng.SetTransform(n, f32.Affine{
+				{float32(bullet.Width), 0, float32(firingPoint.X)},
+				{0, float32(bullet.Height), float32(firingPoint.Y)},
+			})
+		})
+
+	} else {
+		nextShipPos = &t.Loc
+	}
 }
 
 func setupScene() *sprite.Node {
-	scene := &sprite.Node{}
+	scene = &sprite.Node{}
 	eng.Register(scene)
 	eng.SetTransform(scene, f32.Affine{
 		{1, 0, 0},
@@ -83,10 +108,8 @@ func setupScene() *sprite.Node {
 	})
 
 	playerShip := loadSprite("player_ship.png")
+	shipNode := newNode()
 
-	shipNode := &sprite.Node{}
-	eng.Register(shipNode)
-	scene.AppendChild(shipNode)
 	shipNode.Arranger = arrangerFunc(func(eng sprite.Engine, n *sprite.Node, t clock.Time) {
 		eng.SetSubTex(n, playerShip.SubTex)
 
@@ -124,13 +147,20 @@ func setupScene() *sprite.Node {
 	return scene
 }
 
+func newNode() *sprite.Node {
+	node := &sprite.Node{}
+	eng.Register(node)
+	scene.AppendChild(node)
+	return node
+}
+
 type Sprite struct {
 	sprite.SubTex
 	Width, Height int
 }
 
 func loadSprite(fileName string) Sprite {
-	a, err := asset.Open("player_ship.png")
+	a, err := asset.Open(fileName)
 	if err != nil {
 		log.Fatal(err)
 	}
