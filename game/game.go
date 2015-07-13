@@ -22,6 +22,7 @@ import (
 
 const (
 	shipDeltaV   float32 = 1.2
+	enemyDeltaV  float32 = 0.7
 	bulletDeltaV geom.Pt = 3
 )
 
@@ -63,6 +64,9 @@ func stop() {
 }
 
 func draw(c event.Config) {
+	secondsFromStart := time.Since(startTime) * 60 / time.Second
+	now := clock.Time(secondsFromStart)
+
 	currentBottomRight := geom.Point{c.Width, c.Height}
 	if bottomRight == nil || currentBottomRight != *bottomRight {
 		bottomRight = &currentBottomRight
@@ -75,13 +79,11 @@ func draw(c event.Config) {
 	}
 
 	if fullScene == nil {
-		fullScene = setupScene(c.Width, c.Height)
+		fullScene = setupScene(c.Width, c.Height, secondsFromStart)
 	}
 
 	gl.ClearColor(0, 0, 0, 0)
 	gl.Clear(gl.COLOR_BUFFER_BIT)
-
-	now := clock.Time(time.Since(startTime) * 60 / time.Second)
 
 	eng.Render(fullScene, now, c)
 	debug.DrawFPS(c)
@@ -112,7 +114,7 @@ func fireBullet(loc geom.Point) {
 	bulletNode.Arranger = arrangerFunc(func(eng sprite.Engine, n *sprite.Node, t clock.Time) {
 		eng.SetSubTex(n, bullet.SubTex)
 
-		bulletScalingFactor := 4
+		const bulletScalingFactor = 4
 		width := float32(bullet.Width / bulletScalingFactor)
 		height := float32(bullet.Height / bulletScalingFactor)
 
@@ -129,7 +131,7 @@ func fireBullet(loc geom.Point) {
 	bullets = append(bullets, Bullet{bullet})
 }
 
-func setupScene(width, height geom.Pt) *sprite.Node {
+func setupScene(width, height geom.Pt, secondsFromStart time.Duration) *sprite.Node {
 	fullScene = &sprite.Node{}
 	eng.Register(fullScene)
 	eng.SetTransform(fullScene, f32.Affine{
@@ -142,9 +144,12 @@ func setupScene(width, height geom.Pt) *sprite.Node {
 
 	setupShip(foreground, width)
 
-	for i := 0; i <= 4; i++ {
-		setupEnemy(foreground, width)
-	}
+	go func() {
+		for {
+			setupEnemy(foreground, width)
+			time.Sleep(2 * time.Second)
+		}
+	}()
 
 	return fullScene
 }
@@ -223,17 +228,25 @@ func setupEnemy(parentNode *sprite.Node, screenWidth geom.Pt) {
 	enemy := Enemy{*enemySprite}
 	enemyNode := newNode(parentNode)
 
-	x := float32(rand.Intn(int(screenWidth) - enemy.Width))
+	const enemyScalingFactor = 4
+	width := float32(enemy.Width / enemyScalingFactor)
+	height := float32(enemy.Height / enemyScalingFactor)
+
+	x := float32(rand.Intn(int(screenWidth) - int(width)))
 	var y float32 = 20
 
 	enemyNode.Arranger = arrangerFunc(func(eng sprite.Engine, n *sprite.Node, t clock.Time) {
 		eng.SetSubTex(n, enemy.SubTex)
 
 		eng.SetTransform(n, f32.Affine{
-			{float32(enemy.Width), 0, x},
-			{0, float32(enemy.Height), y},
+			{width, 0, x},
+			{0, height, y},
 		})
+
+		y = y + enemyDeltaV
 	})
+
+	enemies = append(enemies, enemy)
 }
 
 func loadSprite(fileName string) Sprite {
