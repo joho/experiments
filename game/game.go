@@ -3,6 +3,7 @@ package main
 import (
 	"image"
 	"log"
+	"math/rand"
 	"time"
 
 	_ "image/png"
@@ -19,6 +20,11 @@ import (
 	"golang.org/x/mobile/gl"
 )
 
+const (
+	shipDeltaV   float32 = 1.2
+	bulletDeltaV geom.Pt = 3
+)
+
 var (
 	startTime = time.Now()
 
@@ -27,14 +33,16 @@ var (
 	foreground *sprite.Node
 	eng        = glsprite.Engine()
 
-	shipDeltaV   float32 = 1.2
-	bulletDeltaV geom.Pt = 3
-
-	shipPos = geom.Point{100, 100}
+	shipPos *geom.Point
 
 	nextShipPos *geom.Point
 
 	bottomRight *geom.Point
+
+	bullets = []Bullet{}
+
+	enemySprite *Sprite
+	enemies     = []Enemy{}
 )
 
 func main() {
@@ -67,7 +75,7 @@ func draw(c event.Config) {
 	}
 
 	if fullScene == nil {
-		fullScene = setupScene()
+		fullScene = setupScene(c.Width, c.Height)
 	}
 
 	gl.ClearColor(0, 0, 0, 0)
@@ -84,36 +92,44 @@ func touch(t event.Touch, c event.Config) {
 
 	bottomTenthY := c.Height - c.Height/8
 	if t.Loc.Y > bottomTenthY {
-		log.Println("FIRE ZE MISSLES")
-
-		firingPoint := shipPos
-
-		bullet := loadSprite("bullet.png")
-		bulletNode := newNode(background)
-		bulletNode.Arranger = arrangerFunc(func(eng sprite.Engine, n *sprite.Node, t clock.Time) {
-			eng.SetSubTex(n, bullet.SubTex)
-
-			bulletScalingFactor := 4
-			width := float32(bullet.Width / bulletScalingFactor)
-			height := float32(bullet.Height / bulletScalingFactor)
-
-			x := float32(firingPoint.X) - float32(bullet.Width/(2*bulletScalingFactor))
-			y := float32(firingPoint.Y) - 20 // magic number for tip of ship
-
-			eng.SetTransform(n, f32.Affine{
-				{width, 0, x},
-				{0, height, y},
-			})
-
-			firingPoint.Y = firingPoint.Y - bulletDeltaV
-		})
-
+		fireBullet(t.Loc)
 	} else {
-		nextShipPos = &t.Loc
+		setShipDestination(t.Loc)
 	}
 }
 
-func setupScene() *sprite.Node {
+func setShipDestination(loc geom.Point) {
+	nextShipPos = &loc
+}
+
+func fireBullet(loc geom.Point) {
+	log.Println("FIRE ZE MISSLES")
+
+	firingPoint := *shipPos
+
+	bullet := loadSprite("bullet.png")
+	bulletNode := newNode(background)
+	bulletNode.Arranger = arrangerFunc(func(eng sprite.Engine, n *sprite.Node, t clock.Time) {
+		eng.SetSubTex(n, bullet.SubTex)
+
+		bulletScalingFactor := 4
+		width := float32(bullet.Width / bulletScalingFactor)
+		height := float32(bullet.Height / bulletScalingFactor)
+
+		x := float32(firingPoint.X) - float32(bullet.Width/(2*bulletScalingFactor))
+		y := float32(firingPoint.Y) - 20 // magic number for tip of ship
+
+		eng.SetTransform(n, f32.Affine{
+			{width, 0, x},
+			{0, height, y},
+		})
+
+		firingPoint.Y = firingPoint.Y - bulletDeltaV
+	})
+	bullets = append(bullets, Bullet{bullet})
+}
+
+func setupScene(width, height geom.Pt) *sprite.Node {
 	fullScene = &sprite.Node{}
 	eng.Register(fullScene)
 	eng.SetTransform(fullScene, f32.Affine{
@@ -124,8 +140,44 @@ func setupScene() *sprite.Node {
 	background = newNode(fullScene)
 	foreground = newNode(fullScene)
 
+	setupShip(foreground, width)
+
+	for i := 0; i <= 4; i++ {
+		setupEnemy(foreground, width)
+	}
+
+	return fullScene
+}
+
+func newNode(scene *sprite.Node) *sprite.Node {
+	node := &sprite.Node{}
+	eng.Register(node)
+	scene.AppendChild(node)
+	return node
+}
+
+type Sprite struct {
+	sprite.SubTex
+	Width, Height int
+}
+
+type Bullet struct {
+	Sprite
+}
+
+type Enemy struct {
+	Sprite
+}
+
+func setupShip(parentNode *sprite.Node, screenWidth geom.Pt) {
 	playerShip := loadSprite("player_ship.png")
 	shipNode := newNode(foreground)
+	if shipPos == nil {
+		shipPos = &geom.Point{
+			screenWidth / 2,
+			100,
+		}
+	}
 
 	shipNode.Arranger = arrangerFunc(func(eng sprite.Engine, n *sprite.Node, t clock.Time) {
 		eng.SetSubTex(n, playerShip.SubTex)
@@ -134,7 +186,7 @@ func setupScene() *sprite.Node {
 		height := float32(playerShip.Height)
 
 		if nextShipPos != nil {
-			if *nextShipPos == shipPos {
+			if *nextShipPos == *shipPos {
 				nextShipPos = nil
 			} else {
 				if nextShipPos.X > shipPos.X {
@@ -160,20 +212,28 @@ func setupScene() *sprite.Node {
 			{0, height, y},
 		})
 	})
-
-	return fullScene
 }
 
-func newNode(scene *sprite.Node) *sprite.Node {
-	node := &sprite.Node{}
-	eng.Register(node)
-	scene.AppendChild(node)
-	return node
-}
+func setupEnemy(parentNode *sprite.Node, screenWidth geom.Pt) {
+	if enemySprite == nil {
+		sprite := loadSprite("baddy_one.png")
+		enemySprite = &sprite
+	}
 
-type Sprite struct {
-	sprite.SubTex
-	Width, Height int
+	enemy := Enemy{*enemySprite}
+	enemyNode := newNode(parentNode)
+
+	x := float32(rand.Intn(int(screenWidth) - enemy.Width))
+	var y float32 = 20
+
+	enemyNode.Arranger = arrangerFunc(func(eng sprite.Engine, n *sprite.Node, t clock.Time) {
+		eng.SetSubTex(n, enemy.SubTex)
+
+		eng.SetTransform(n, f32.Affine{
+			{float32(enemy.Width), 0, x},
+			{0, float32(enemy.Height), y},
+		})
+	})
 }
 
 func loadSprite(fileName string) Sprite {
