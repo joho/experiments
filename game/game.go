@@ -47,6 +47,8 @@ var (
 
 	enemySprite *Sprite
 	enemies     = []Enemy{}
+
+	screenWidth *geom.Pt
 )
 
 func main() {
@@ -87,9 +89,8 @@ func draw(c config.Event) {
 	secondsFromStart := time.Since(startTime) * 60 / time.Second
 	now := clock.Time(secondsFromStart)
 
-	currentBottomRight := geom.Point{c.Width, c.Height}
-	if bottomRight == nil || currentBottomRight != *bottomRight {
-		bottomRight = &currentBottomRight
+	if screenWidth == nil || *screenWidth != c.Width {
+		screenWidth = &c.Width
 
 		log.Printf("Device Sizing: %vx%v PixelsPerPt:%v",
 			c.Width,
@@ -166,7 +167,7 @@ func setupScene(width, height geom.Pt, secondsFromStart time.Duration) *sprite.N
 
 	go func() {
 		for {
-			setupEnemy(foreground, width)
+			setupEnemy(foreground, *screenWidth)
 			time.Sleep(2 * time.Second)
 		}
 	}()
