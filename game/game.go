@@ -58,7 +58,7 @@ func main() {
 			switch ee := app.Filter(e).(type) {
 			case paint.Event:
 				draw(conf)
-				a.EndPaint()
+				a.EndPaint(e.(paint.Event))
 			case touch.Event:
 				onTouch(ee, conf)
 			case config.Event:
@@ -89,18 +89,18 @@ func draw(c config.Event) {
 	secondsFromStart := time.Since(startTime) * 60 / time.Second
 	now := clock.Time(secondsFromStart)
 
-	if screenWidth == nil || *screenWidth != c.Width {
-		screenWidth = &c.Width
+	if screenWidth == nil || *screenWidth != c.WidthPt {
+		screenWidth = &c.WidthPt
 
 		log.Printf("Device Sizing: %vx%v PixelsPerPt:%v",
-			c.Width,
-			c.Height,
+			c.WidthPt,
+			c.HeightPt,
 			c.PixelsPerPt,
 		)
 	}
 
 	if fullScene == nil {
-		fullScene = setupScene(c.Width, c.Height, secondsFromStart)
+		fullScene = setupScene(c.WidthPt, c.HeightPt, secondsFromStart)
 	}
 
 	gl.ClearColor(0, 0, 0, 0)
@@ -113,7 +113,7 @@ func draw(c config.Event) {
 func onTouch(t touch.Event, c config.Event) {
 	log.Printf("touch at %v:%v\n", t.Loc.X, t.Loc.Y)
 
-	bottomTenthY := c.Height - c.Height/8
+	bottomTenthY := c.HeightPt - c.HeightPt/8
 	if t.Loc.Y > bottomTenthY {
 		fireBullet(t.Loc)
 	} else {
