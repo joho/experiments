@@ -10,7 +10,10 @@ import (
 
 	"golang.org/x/mobile/app"
 	"golang.org/x/mobile/asset"
-	"golang.org/x/mobile/event"
+	"golang.org/x/mobile/event/config"
+	"golang.org/x/mobile/event/lifecycle"
+	"golang.org/x/mobile/event/paint"
+	"golang.org/x/mobile/event/touch"
 	"golang.org/x/mobile/exp/app/debug"
 	"golang.org/x/mobile/exp/f32"
 	"golang.org/x/mobile/exp/sprite"
@@ -47,11 +50,28 @@ var (
 )
 
 func main() {
-	app.Run(app.Callbacks{
-		Start: start,
-		Draw:  draw,
-		Stop:  stop,
-		Touch: touch,
+	var conf config.Event
+	app.Main(func(a app.App) {
+		for e := range a.Events() {
+			switch ee := app.Filter(e).(type) {
+			case paint.Event:
+				draw(conf)
+				a.EndPaint()
+			case touch.Event:
+				onTouch(ee, conf)
+			case config.Event:
+				conf = ee
+			case lifecycle.Event:
+				switch ee.Crosses(lifecycle.StageVisible) {
+				case lifecycle.CrossOn:
+					start()
+				case lifecycle.CrossOff:
+					// occasionally doesn't work and need to CTRL+C the console
+					stop()
+					return
+				}
+			}
+		}
 	})
 }
 
@@ -63,7 +83,7 @@ func stop() {
 	log.Println("stopping app")
 }
 
-func draw(c event.Config) {
+func draw(c config.Event) {
 	secondsFromStart := time.Since(startTime) * 60 / time.Second
 	now := clock.Time(secondsFromStart)
 
@@ -89,7 +109,7 @@ func draw(c event.Config) {
 	debug.DrawFPS(c)
 }
 
-func touch(t event.Touch, c event.Config) {
+func onTouch(t touch.Event, c config.Event) {
 	log.Printf("touch at %v:%v\n", t.Loc.X, t.Loc.Y)
 
 	bottomTenthY := c.Height - c.Height/8
